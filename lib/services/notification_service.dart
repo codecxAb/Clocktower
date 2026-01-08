@@ -10,6 +10,14 @@ class NotificationService {
     _notificationsPlugin = flutterLocalNotificationsPlugin;
     tz.initializeTimeZones();
 
+    // Try to get device timezone, fallback to UTC
+    try {
+      tz.setLocalLocation(
+          tz.getLocation('Asia/Kolkata')); // Default to IST for India
+    } catch (e) {
+      print('Could not set timezone, using UTC: $e');
+    }
+
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
@@ -47,13 +55,21 @@ class NotificationService {
         ?.requestNotificationsPermission();
 
     print('Notification permission granted: $androidPermission');
+
+    // Request exact alarm permission for Android 12+
+    final exactAlarmPermission = await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestExactAlarmsPermission();
+
+    print('Exact alarm permission granted: $exactAlarmPermission');
   }
 
-  static Future<void> scheduleNotification({
+  // Show immediate notification for testing
+  static Future<void> showImmediateNotification({
     required int id,
     required String title,
     required String body,
-    required DateTime scheduledTime,
   }) async {
     if (_notificationsPlugin == null) {
       print('Error: Notification plugin not initialized');
@@ -84,30 +100,93 @@ class NotificationService {
       iOS: iOSPlatformChannelSpecifics,
     );
 
-    final scheduledDate = tz.TZDateTime.from(scheduledTime, tz.local);
-    print('Scheduling notification $id for: $scheduledDate');
-    print('Current time: ${tz.TZDateTime.now(tz.local)}');
+    try {
+      await _notificationsPlugin!.show(
+        id,
+        title,
+        body,
+        platformChannelSpecifics,
+      );
+      print('✅ Immediate notification shown successfully');
+    } catch (e) {
+      print('❌ Error showing immediate notification: $e');
+    }
+  }
 
-    await _notificationsPlugin!.zonedSchedule(
-      id,
-      title,
-      body,
-      scheduledDate,
-      platformChannelSpecifics,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
+  static Future<void> scheduleNotification({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime scheduledTime,
+  }) async {
+    if (_notificationsPlugin == null) {
+      print('❌ Error: Notification plugin not initialized');
+      return;
+    }
+
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'builder_timer_channel',
+      'Builder Timers',
+      channelDescription: 'Notifications for builder timer completions',
+      importance: Importance.max,
+      priority: Priority.high,
+      showWhen: true,
+      playSound: true,
+      enableVibration: true,
     );
 
-    print('Notification scheduled successfully');
+    const DarwinNotificationDetails iOSPlatformChannelSpecifics =
+        DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    const NotificationDetails platformChannelSpecifics = NotificationDetails(
+      android: androidPlatformChannelSpecifics,
+      iOS: iOSPlatformChannelSpecifics,
+    );
+
+    final scheduledDate = tz.TZDateTime.from(scheduledTime, tz.local);
+    final now = tz.TZDateTime.now(tz.local);
+    final duration = scheduledDate.difference(now);
+
+    print('📅 Scheduling notification $id');
+    print('   Current time: $now');
+    print('   Scheduled for: $scheduledDate');
+    print('   Duration until: $duration');
+
+    if (duration.isNegative) {
+      print('❌ Error: Cannot schedule notification in the past!');
+      return;
+    }
+
+    try {
+      await _notificationsPlugin!.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        platformChannelSpecifics,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+
+      print('✅ Notification scheduled successfully!');
+    } catch (e) {
+      print('❌ Error scheduling notification: $e');
+      rethrow;
+    }
   }
 
   static Future<void> cancelNotification(int id) async {
     if (_notificationsPlugin == null) {
-      print('Error: Notification plugin not initialized');
+      print('❌ Error: Notification plugin not initialized');
       return;
     }
     await _notificationsPlugin!.cancel(id);
-    print('Notification $id cancelled');
+    print('🚫 Notification $id cancelled');
   }
 }
