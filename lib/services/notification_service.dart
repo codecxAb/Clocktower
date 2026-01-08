@@ -3,10 +3,13 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
 
 class NotificationService {
+  static FlutterLocalNotificationsPlugin? _notificationsPlugin;
+
   static Future<void> initialize(
       FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin) async {
+    _notificationsPlugin = flutterLocalNotificationsPlugin;
     tz.initializeTimeZones();
-    
+
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
@@ -38,10 +41,12 @@ class NotificationService {
         );
 
     // Request permissions for Android 13+
-    await flutterLocalNotificationsPlugin
+    final androidPermission = await flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
         ?.requestNotificationsPermission();
+
+    print('Notification permission granted: $androidPermission');
   }
 
   static Future<void> scheduleNotification({
@@ -50,8 +55,10 @@ class NotificationService {
     required String body,
     required DateTime scheduledTime,
   }) async {
-    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-        FlutterLocalNotificationsPlugin();
+    if (_notificationsPlugin == null) {
+      print('Error: Notification plugin not initialized');
+      return;
+    }
 
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
@@ -61,6 +68,8 @@ class NotificationService {
       importance: Importance.max,
       priority: Priority.high,
       showWhen: true,
+      playSound: true,
+      enableVibration: true,
     );
 
     const DarwinNotificationDetails iOSPlatformChannelSpecifics =
@@ -75,21 +84,30 @@ class NotificationService {
       iOS: iOSPlatformChannelSpecifics,
     );
 
-    await flutterLocalNotificationsPlugin.zonedSchedule(
+    final scheduledDate = tz.TZDateTime.from(scheduledTime, tz.local);
+    print('Scheduling notification $id for: $scheduledDate');
+    print('Current time: ${tz.TZDateTime.now(tz.local)}');
+
+    await _notificationsPlugin!.zonedSchedule(
       id,
       title,
       body,
-      tz.TZDateTime.from(scheduledTime, tz.local),
+      scheduledDate,
       platformChannelSpecifics,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );
+
+    print('Notification scheduled successfully');
   }
 
   static Future<void> cancelNotification(int id) async {
-    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-        FlutterLocalNotificationsPlugin();
-    await flutterLocalNotificationsPlugin.cancel(id);
+    if (_notificationsPlugin == null) {
+      print('Error: Notification plugin not initialized');
+      return;
+    }
+    await _notificationsPlugin!.cancel(id);
+    print('Notification $id cancelled');
   }
 }

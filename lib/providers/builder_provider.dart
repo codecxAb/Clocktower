@@ -150,7 +150,7 @@ class BuilderProvider extends ChangeNotifier {
       // Only update if there are active timers to improve battery efficiency
       bool hasActiveTimers = false;
       bool hasChanges = false;
-      
+
       for (var builders in _accountBuilders.values) {
         for (var builder in builders) {
           if (builder.isActive) {
@@ -162,7 +162,7 @@ class BuilderProvider extends ChangeNotifier {
           }
         }
       }
-      
+
       // Only notify listeners when there are active timers or when state changes
       if (hasActiveTimers || hasChanges) {
         if (hasChanges) {
@@ -185,8 +185,14 @@ class BuilderProvider extends ChangeNotifier {
 
     await _saveData();
 
-    // Use combined account+builder ID for unique notifications
-    final notificationId = int.parse('$_selectedAccountId$builderId');
+    // Use a more reliable notification ID (hash of account+builder)
+    final notificationId =
+        (_selectedAccountId.hashCode + builderId).abs() % 2147483647;
+
+    print(
+        'Starting timer for builder $builderId with notification ID: $notificationId');
+    print('End time: ${builder.endTime}');
+
     await NotificationService.scheduleNotification(
       id: notificationId,
       title: '${selectedAccount?.name} - Builder $builderId Complete!',
@@ -208,7 +214,8 @@ class BuilderProvider extends ChangeNotifier {
 
     await _saveData();
 
-    final notificationId = int.parse('$_selectedAccountId$builderId');
+    final notificationId =
+        (_selectedAccountId.hashCode + builderId).abs() % 2147483647;
     await NotificationService.cancelNotification(notificationId);
 
     notifyListeners();

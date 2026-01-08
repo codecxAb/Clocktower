@@ -4,6 +4,7 @@ import '../providers/builder_provider.dart';
 import '../widgets/builder_card.dart';
 import '../widgets/account_selector.dart';
 import '../widgets/add_account_dialog.dart';
+import '../widgets/notification_test_button.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -27,6 +28,25 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_active),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Test Notification'),
+                  content: const NotificationTestButton(),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
+              );
+            },
+            tooltip: 'Test Notification',
+          ),
           IconButton(
             icon: const Icon(Icons.add_circle_outline),
             onPressed: () {
